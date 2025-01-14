@@ -206,7 +206,7 @@ func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, resul
 			atomic.AddUint64(&stats.EmptyHashes, 1)
 			globalStats.AddErrors(1)
 			log.Printf("[%s] Block %d: Empty hash encountered", zoneName, i)
-			break
+			continue
 		}
 
 		block := rawdb.ReadBlock(db, hash, i)
@@ -236,7 +236,7 @@ func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, resul
 
 				log.Printf("[%s] Block %d outside epoch range %d-%d i:%d", zoneName, blockNum, start, end, i)
 			}
-			continue
+			// continue
 		}
 
 		atomic.AddUint64(&stats.Successful, 1)
@@ -244,23 +244,6 @@ func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, resul
 
 		coinbase := block.Coinbase().Hex()
 		minerCounts[coinbase]++
-
-		if i%1000 == 0 {
-			log.Printf("[%s] Block %d Details:", zoneName, i)
-			log.Printf("  Hash: %s", hash.Hex())
-			log.Printf("  Miner: %s", coinbase)
-			log.Printf("  Block Number: %v", blockNum)
-			log.Printf("  Timestamp: %v", block.Time())
-			log.Printf("  Parent Hash: %v", block.ParentHash().Hex())
-			log.Printf("  Transaction Count: %d", len(block.Transactions()))
-
-			// Print current stats
-			log.Printf("  Processing Statistics:")
-			log.Printf("    Checked: %d", atomic.LoadUint64(&stats.TotalChecked))
-			log.Printf("    Successful: %d", atomic.LoadUint64(&stats.Successful))
-			log.Printf("    Errors: %d", atomic.LoadUint64(&stats.EmptyHashes)+atomic.LoadUint64(&stats.NilBlocks))
-			log.Printf("    Out of Range: %d", atomic.LoadUint64(&stats.OutOfRange))
-		}
 	}
 
 	// Print final statistics for this epoch
