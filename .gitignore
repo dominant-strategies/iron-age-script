@@ -1,0 +1,16 @@
+# Backup files
+quai_backup_2023_10_04.tar.gz
+quai_backup_2023_10_04/
+
+# Compiled binary
+blocks-mined
+
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
