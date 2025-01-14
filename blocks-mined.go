@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -153,6 +154,12 @@ func findZones(rootDir string) ([]string, error) {
 			continue
 		}
 
+		// Skip prime and region directories
+		if strings.HasPrefix(entry.Name(), "prime") || strings.HasPrefix(entry.Name(), "region") {
+			log.Printf("Skipping non-zone directory: %s", entry.Name())
+			continue
+		}
+
 		// For each zone directory, look for quai/chaindata
 		zonePath := filepath.Join(rootDir, entry.Name(), "quai", "chaindata")
 		if _, err := os.Stat(zonePath); err == nil {
@@ -175,6 +182,10 @@ func findZones(rootDir string) ([]string, error) {
 				log.Printf("Found zone chaindata: %s (Zone: %s)", zonePath, entry.Name())
 			}
 		}
+	}
+
+	if len(zones) == 0 {
+		log.Printf("Warning: No zone directories found (skipped prime and region directories)")
 	}
 
 	return zones, nil

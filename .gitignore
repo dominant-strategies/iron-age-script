@@ -14,3 +14,5 @@ blocks-mined
 *.test
 *.out
 go.work
+
+test_folder
