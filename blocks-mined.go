@@ -205,9 +205,7 @@ func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, resul
 		if hash == (common.Hash{}) {
 			atomic.AddUint64(&stats.EmptyHashes, 1)
 			globalStats.AddErrors(1)
-			if i%10000 == 0 {
-				log.Printf("[%s] Block %d: Empty hash encountered", zoneName, i)
-			}
+			log.Printf("[%s] Block %d: Empty hash encountered", zoneName, i)
 			break
 		}
 
@@ -227,7 +225,7 @@ func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, resul
 			atomic.AddUint64(&stats.OutOfRange, 1)
 			globalStats.AddOutOfRange(1)
 			if i%10000 == 0 {
-				log.Printf("[%s] Block %d outside epoch range %d-%d", zoneName, blockNum, start, end)
+				log.Printf("[%s] Block %d outside epoch range %d-%d i:%d", zoneName, blockNum, start, end, i)
 			}
 			continue
 		}
