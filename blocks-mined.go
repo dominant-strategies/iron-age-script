@@ -225,6 +225,15 @@ func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, resul
 			atomic.AddUint64(&stats.OutOfRange, 1)
 			globalStats.AddOutOfRange(1)
 			if i%10000 == 0 {
+				coinbase := block.Coinbase().Hex()
+				log.Printf("[%s] Block %d Details:", zoneName, i)
+				log.Printf("  Hash: %s", hash.Hex())
+				log.Printf("  Miner: %s", coinbase)
+				log.Printf("  Block Number: %v", blockNum)
+				log.Printf("  Timestamp: %v", block.Time())
+				log.Printf("  Parent Hash: %v", block.ParentHash().Hex())
+				log.Printf("  Transaction Count: %d", len(block.Transactions()))
+
 				log.Printf("[%s] Block %d outside epoch range %d-%d i:%d", zoneName, blockNum, start, end, i)
 			}
 			continue
