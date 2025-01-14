@@ -75,6 +75,8 @@ github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2/go.mod h1:SqUrOPUn
 github.com/dgryski/go-sip13 v0.0.0-20181026042036-e10d5fee7954/go.mod h1:vAd38F8PWV+bWy6jNmig1y/TA+kYO4g3RSRF0IAv0no=
 github.com/dominant-strategies/go-quai v0.23.1 h1:qoGR6J78kEwWLruR+cjyI79NJrsDow1rYAWTobb5PY8=
 github.com/dominant-strategies/go-quai v0.23.1/go.mod h1:LQ/o4Mrx1YV/4TJK2o3fKuJIx811LpirNCk1FrrxkTQ=
+github.com/dominant-strategies/go-quai v0.27.0 h1:ds2q/itMTpURoJ/FjO0yupbfcUQIJgjFswtLiPPryp8=
+github.com/dominant-strategies/go-quai v0.27.0/go.mod h1:NCfqJ7mo9kyAXQUafIpuWfOFu7eaIAz9ZvBBQHkI0dA=
 github.com/dominant-strategies/go-quai v0.28.2 h1:ukvCjChPc4uP/4nHQPKg+cBRs5n2A+ILghp/GLaVudo=
 github.com/dominant-strategies/go-quai v0.28.2/go.mod h1:NCfqJ7mo9kyAXQUafIpuWfOFu7eaIAz9ZvBBQHkI0dA=
 github.com/dominant-strategies/go-quai v0.41.1 h1:iaao6iWVf/5mWJYsMjMYLu/oIDxlGBc4+RhAGZnR2Gs=

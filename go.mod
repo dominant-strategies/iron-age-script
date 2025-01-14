@@ -4,7 +4,7 @@ go 1.23.1
 
 toolchain go1.23.4
 
-require github.com/dominant-strategies/go-quai v0.28.2
+require github.com/dominant-strategies/go-quai v0.27.0
 
 require (
 	github.com/DataDog/zstd v1.5.2 // indirect

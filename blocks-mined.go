@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
+	"sync/atomic"
 
 	"github.com/dominant-strategies/go-quai/common"
 	"github.com/dominant-strategies/go-quai/core/rawdb"
@@ -26,6 +26,31 @@ type MinerCount struct {
 	Address string
 	Zone    string
 	Count   int
+}
+
+type BlockStats struct {
+	TotalChecked uint64
+	EmptyHashes  uint64
+	NilBlocks    uint64
+	Successful   uint64
+}
+
+type GlobalStats struct {
+	TotalChecked   uint64
+	TotalErrors    uint64
+	TotalSuccesses uint64
+}
+
+func (gs *GlobalStats) AddChecked(n uint64) {
+	atomic.AddUint64(&gs.TotalChecked, n)
+}
+
+func (gs *GlobalStats) AddErrors(n uint64) {
+	atomic.AddUint64(&gs.TotalErrors, n)
+}
+
+func (gs *GlobalStats) AddSuccesses(n uint64) {
+	atomic.AddUint64(&gs.TotalSuccesses, n)
 }
 
 // DatabaseReader wraps leveldb.Database to implement ethdb.Reader
@@ -146,41 +171,43 @@ func findZones(rootDir string) ([]string, error) {
 	return zones, nil
 }
 
-func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, results chan<- MinerCount) error {
+func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, results chan<- MinerCount, globalStats *GlobalStats) error {
 	minerCounts := make(map[string]int)
-	processedBlocks := 0
-	emptyHashes := 0
-	nilBlocks := 0
+	stats := BlockStats{}
 
 	log.Printf("[%s] Starting block processing from %d to %d", zoneName, start, end)
 
 	for i := start; i <= end; i++ {
+		atomic.AddUint64(&stats.TotalChecked, 1)
+		globalStats.AddChecked(1)
+
 		hash := rawdb.ReadCanonicalHash(db, i)
 		if hash == (common.Hash{}) {
-			emptyHashes++
+			atomic.AddUint64(&stats.EmptyHashes, 1)
+			globalStats.AddErrors(1)
 			if i%10000 == 0 {
 				log.Printf("[%s] Block %d: Empty hash encountered", zoneName, i)
 			}
 			continue
 		}
 
-		// Modify the block processing part in processZoneEpoch:
 		block := rawdb.ReadBlock(db, hash, i)
 		if block == nil {
-			nilBlocks++
+			atomic.AddUint64(&stats.NilBlocks, 1)
+			globalStats.AddErrors(1)
 			if i%10000 == 0 {
 				log.Printf("[%s] Block %d: Nil block encountered", zoneName, i)
 			}
 			continue
 		}
 
-		// Add detailed block information
+		atomic.AddUint64(&stats.Successful, 1)
+		globalStats.AddSuccesses(1)
+
 		coinbase := block.Coinbase().Hex()
 		minerCounts[coinbase]++
-		processedBlocks++
 
-		// Print block details
-		if i%1000 == 0 { // Changed from 10000 to show more blocks
+		if i%1000 == 0 {
 			log.Printf("[%s] Block %d Details:", zoneName, i)
 			log.Printf("  Hash: %s", hash.Hex())
 			log.Printf("  Miner: %s", coinbase)
@@ -192,48 +219,29 @@ func processZoneEpoch(db ethdb.Reader, zoneName string, start, end uint64, resul
 			log.Printf("  GasUsed: %v", block.GasUsed())
 			log.Printf("  Transaction Count: %d", len(block.Transactions()))
 
-			// Print first transaction hash if exists
 			if len(block.Transactions()) > 0 {
 				log.Printf("  First Tx Hash: %s", block.Transactions()[0].Hash().Hex())
 			}
 
 			log.Printf("  Size: %d bytes", block.Size())
 			log.Printf("  Difficulty: %v", block.Difficulty())
+
+			// Add current statistics
+			log.Printf("  Current Stats - Checked: %d, Successful: %d, Errors: %d",
+				atomic.LoadUint64(&stats.TotalChecked),
+				atomic.LoadUint64(&stats.Successful),
+				atomic.LoadUint64(&stats.EmptyHashes)+atomic.LoadUint64(&stats.NilBlocks))
 		}
 	}
 
-	log.Printf("[%s] Zone Processing Complete:", zoneName)
-	log.Printf("[%s] Total blocks processed: %d", zoneName, processedBlocks)
-	log.Printf("[%s] Total empty hashes encountered: %d", zoneName, emptyHashes)
-	log.Printf("[%s] Total nil blocks encountered: %d", zoneName, nilBlocks)
-	log.Printf("[%s] Unique miners found: %d", zoneName, len(minerCounts))
-
-	// Print top 5 miners by blocks mined
-	type minerStat struct {
-		address string
-		count   int
-	}
-	var minerStats []minerStat
-	for addr, count := range minerCounts {
-		minerStats = append(minerStats, minerStat{addr, count})
-	}
-	sort.Slice(minerStats, func(i, j int) bool {
-		return minerStats[i].count > minerStats[j].count
-	})
-
-	log.Printf("[%s] Top 5 miners:", zoneName)
-	for i := 0; i < len(minerStats) && i < 5; i++ {
-		log.Printf("[%s] %d. Address: %s, Blocks: %d",
-			zoneName, i+1, minerStats[i].address, minerStats[i].count)
-	}
-
-	// Send results through channel
-	for addr, count := range minerCounts {
-		results <- MinerCount{
-			Address: addr,
-			Zone:    zoneName,
-			Count:   count,
-		}
+	log.Printf("\n[%s] Zone Processing Complete:", zoneName)
+	log.Printf("Total Blocks Checked: %d", atomic.LoadUint64(&stats.TotalChecked))
+	log.Printf("Successfully Processed: %d", atomic.LoadUint64(&stats.Successful))
+	log.Printf("Empty Hash Errors: %d", atomic.LoadUint64(&stats.EmptyHashes))
+	log.Printf("Nil Block Errors: %d", atomic.LoadUint64(&stats.NilBlocks))
+	if stats.TotalChecked > 0 {
+		successRate := float64(stats.Successful) / float64(stats.TotalChecked) * 100
+		log.Printf("Success Rate: %.2f%%", successRate)
 	}
 
 	return nil
@@ -270,7 +278,6 @@ func main() {
 	}
 	rootDir := os.Args[1]
 
-	// Find all zone directories
 	zones, err := findZones(rootDir)
 	if err != nil {
 		log.Fatalf("Error finding zones: %v", err)
@@ -281,18 +288,15 @@ func main() {
 		log.Printf("Zone found: %s", zone)
 	}
 
-	// Channel for collecting results from all goroutines
 	resultsEpoch1 := make(chan MinerCount, 1000)
 	resultsEpoch2 := make(chan MinerCount, 1000)
 
 	var wg sync.WaitGroup
+	globalStats := &GlobalStats{}
 
-	// Process each zone
 	for _, zonePath := range zones {
-		// Extract zone name from path (the directory name above 'quai')
 		zoneName := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(zonePath))))
 
-		// Open the database for this zone
 		db, err := openDatabase(zonePath)
 		if err != nil {
 			log.Printf("Error opening database for zone %s: %v", zoneName, err)
@@ -301,18 +305,16 @@ func main() {
 
 		wg.Add(2)
 
-		// Process epoch 1
 		go func(db ethdb.Reader, zone string) {
 			defer wg.Done()
-			if err := processZoneEpoch(db, zone, epoch1Start, epoch1End, resultsEpoch1); err != nil {
+			if err := processZoneEpoch(db, zone, epoch1Start, epoch1End, resultsEpoch1, globalStats); err != nil {
 				log.Printf("Error processing epoch 1 for zone %s: %v", zone, err)
 			}
 		}(db, zoneName)
 
-		// Process epoch 2
 		go func(db ethdb.Reader, zone string) {
 			defer wg.Done()
-			if err := processZoneEpoch(db, zone, epoch2Start, epoch2End, resultsEpoch2); err != nil {
+			if err := processZoneEpoch(db, zone, epoch2Start, epoch2End, resultsEpoch2, globalStats); err != nil {
 				log.Printf("Error processing epoch 2 for zone %s: %v", zone, err)
 			}
 		}(db, zoneName)
@@ -322,28 +324,32 @@ func main() {
 		}
 	}
 
-	// Wait for all processing to complete in a separate goroutine
 	go func() {
 		wg.Wait()
 		close(resultsEpoch1)
 		close(resultsEpoch2)
 	}()
 
-	// Collect results
 	var epoch1Results []MinerCount
 	var epoch2Results []MinerCount
 
-	// Collect epoch 1 results
 	for result := range resultsEpoch1 {
 		epoch1Results = append(epoch1Results, result)
 	}
 
-	// Collect epoch 2 results
 	for result := range resultsEpoch2 {
 		epoch2Results = append(epoch2Results, result)
 	}
 
-	// Write results to files
+	log.Printf("\nGLOBAL STATISTICS:")
+	log.Printf("Total Blocks Checked: %d", atomic.LoadUint64(&globalStats.TotalChecked))
+	log.Printf("Successfully Processed: %d", atomic.LoadUint64(&globalStats.TotalSuccesses))
+	log.Printf("Total Errors: %d", atomic.LoadUint64(&globalStats.TotalErrors))
+	if globalStats.TotalChecked > 0 {
+		successRate := float64(globalStats.TotalSuccesses) / float64(globalStats.TotalChecked) * 100
+		log.Printf("Overall Success Rate: %.2f%%", successRate)
+	}
+
 	if err := writeResults(epoch1Results, "epoch1_miners.csv"); err != nil {
 		log.Printf("Error writing epoch 1 results: %v", err)
 	}
