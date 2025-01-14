@@ -16,3 +16,5 @@ blocks-mined
 go.work
 
 test_folder
+
+*.cvs
