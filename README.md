@@ -15,12 +15,7 @@ git clone <repository-url>
 cd blocks-mined
 ```
 
-2. Ensure you have go-quai in your local environment:
-```bash
-# Your go-quai should be at ~/code/go-quai
-```
-
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 go mod tidy
 ```
